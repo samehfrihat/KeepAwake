@@ -19,11 +19,6 @@ It’s useful for keeping your system awake during long-running processes, prese
 ## Requirements
 
 - Python 3.8+
-- [PyAutoGUI](https://pyautogui.readthedocs.io/en/latest/)
-- Tkinter (bundled with most Python installations)
-- Pillow (needed by PyAutoGUI)
-- PyInstaller (for building the `.exe` file)
-
 ---
 
 ## Installation
