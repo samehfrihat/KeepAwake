@@ -4,11 +4,21 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
 import pyautogui
+import pystray
+from PIL import Image, ImageDraw
 
 pyautogui.FAILSAFE = True  # keep failsafe ON
 
 SAFE_MARGIN = 20       # pixels away from edges to avoid (0,0) trigger # pixels away from edges to avoid failsafe
 TOLERANCE_PX = 3       # ignore tiny jitter
+MAX_LOG_LINES = 60     # store up to 60 log messages
+
+
+def create_tray_image():
+    img = Image.new("RGB", (64, 64), "black")
+    d = ImageDraw.Draw(img)
+    d.rectangle((16, 16, 48, 48), fill="white")
+    return img
 
 def do_keep_awake(minutes, stop_event, log_callback, done_callback):
     minutes = max(1, int(minutes))
@@ -69,6 +79,7 @@ class KeepAwakeApp(tk.Tk):
 
         self.worker_thread = None
         self.stop_event = None
+        self.tray_icon = None
 
         frm = ttk.Frame(self, padding=12)
         frm.pack(fill="both", expand=True)
@@ -97,6 +108,9 @@ class KeepAwakeApp(tk.Tk):
     def log_msg(self, msg):
         self.log.configure(state="normal")
         self.log.insert("end", msg + "\n")
+        lines = int(self.log.index('end-1c').split('.')[0])
+        if lines > MAX_LOG_LINES:
+            self.log.delete('1.0', f"{lines - MAX_LOG_LINES + 1}.0")
         self.log.see("end")
         self.log.configure(state="disabled")
 
@@ -140,10 +154,40 @@ class KeepAwakeApp(tk.Tk):
             self.stop_event.set()
 
     def on_close(self):
+        self.withdraw()
+        self.show_tray_icon()
+
+    def show_tray_icon(self):
+        if self.tray_icon:
+            return
+        image = create_tray_image()
+        menu = pystray.Menu(
+            pystray.MenuItem("Show", lambda icon, item: self.show_window()),
+            pystray.MenuItem("Quit", lambda icon, item: self.quit_from_tray())
+        )
+        self.tray_icon = pystray.Icon("keepawake", image, "KeepAwake", menu)
+        self.tray_icon.run_detached()
+
+    def show_window(self):
+        self.after(0, self._show_window)
+
+    def _show_window(self):
+        if self.tray_icon:
+            self.tray_icon.stop()
+            self.tray_icon = None
+        self.deiconify()
+        self.lift()
+
+    def quit_from_tray(self):
+        self.after(0, self._quit_app)
+
+    def _quit_app(self):
         self.on_stop()
-        # give the worker a moment to exit cleanly
         if self.worker_thread:
             self.worker_thread.join(timeout=0.5)
+        if self.tray_icon:
+            self.tray_icon.stop()
+            self.tray_icon = None
         self.destroy()
 
 

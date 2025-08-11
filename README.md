@@ -12,8 +12,9 @@ It’s useful for keeping your system awake during long-running processes, prese
 - **Start / Stop controls** - Easily toggle the activity simulation.
 - **Failsafe** - Move your mouse to the **top-left corner** of the screen to stop instantly (PyAutoGUI failsafe).
 - **Safe movement** - Avoids triggering failsafe accidentally during normal operation.
-- **Log output** - Shows timestamps when activity is simulated.
-- **skip movement** - Avoid moving the mouse when the user already moved the mouse in the last interval. 
+- **System tray support** - Closing the window hides the app to the system tray; right-click the icon to restore or quit.
+- **Log output** - Shows timestamps when activity is simulated (last 60 messages kept).
+- **skip movement** - Avoid moving the mouse when the user already moved the mouse in the last interval.
 ---
 
 ## Requirements
@@ -31,16 +32,14 @@ It’s useful for keeping your system awake during long-running processes, prese
 3. Activate the virtual environment or just jump to 4.b.:
 
    ```.\.venv\Scripts\activate```
-4. Install dependencies (only one of the two):
-  a. ```pip install pyinstaller pyautogui pillow```
-  b. ```.\.venv\Scripts\pip.exe install pyinstaller pyautogui pillow```
+4. Install dependencies:
+   ```pip install pyinstaller pyautogui pillow pystray```
 
 5. Test code before excution:
-    a. ```& "python "./gui.py"```
-    b. ```& "./.venv/Scripts/python.exe" "./gui.py"```
+    ```& "python "./gui.py"```
 
 6. Building the Executable
-```.\.venv\Scripts\pyinstaller.exe --onefile --windowed --name KeepAwake gui.py```
+```pyinstaller.exe --onefile --windowed --name KeepAwake gui.py```
 The results are available in: .\dist
 
 ---
