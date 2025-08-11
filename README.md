@@ -32,16 +32,14 @@ It’s useful for keeping your system awake during long-running processes, prese
 3. Activate the virtual environment or just jump to 4.b.:
 
    ```.\.venv\Scripts\activate```
-4. Install dependencies (only one of the two):
-  a. ```pip install pyinstaller pyautogui pillow pystray```
-  b. ```.\.venv\Scripts\pip.exe install pyinstaller pyautogui pillow pystray```
+4. Install dependencies:
+   ```pip install pyinstaller pyautogui pillow pystray```
 
 5. Test code before excution:
-    a. ```& "python "./gui.py"```
-    b. ```& "./.venv/Scripts/python.exe" "./gui.py"```
+    ```& "python "./gui.py"```
 
 6. Building the Executable
-```.\.venv\Scripts\pyinstaller.exe --onefile --windowed --name KeepAwake gui.py```
+```pyinstaller.exe --onefile --windowed --name KeepAwake gui.py```
 The results are available in: .\dist
 
 ---
