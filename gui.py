@@ -24,51 +24,117 @@ def do_keep_awake(minutes, stop_event, log_callback, done_callback):
     minutes = max(1, int(minutes))
     interval_s = minutes * 60
 
-    try:
-        while not stop_event.is_set():
-            # Record mouse position at start of interval
-            start_pos = pyautogui.position()
+    MAX_RETRIES = 3
+    FAILSAFE_RECOVERIES = 3
+    retries = 0
 
-            # Wait the whole interval (still check for stop requests)
-            for _ in range(interval_s):
-                if stop_event.is_set():
-                    return
+    while not stop_event.is_set() and retries <= MAX_RETRIES:
+        try:
+            while not stop_event.is_set():
+                # Record mouse position at start of interval
+                start_pos = pyautogui.position()
+
+                # Wait the whole interval (still check for stop requests)
+                for _ in range(interval_s):
+                    if stop_event.is_set():
+                        done_callback()
+                        return
+                    time.sleep(1)
+
+                # Get position now
+                end_pos = pyautogui.position()
+
+                # Compare positions with tolerance
+                moved = abs(end_pos.x - start_pos.x) > TOLERANCE_PX or \
+                        abs(end_pos.y - start_pos.y) > TOLERANCE_PX
+
+                if not moved:
+                    # Perform safe movement path
+                    width, height = pyautogui.size()
+                    usable_h = max(1, height - 2 * SAFE_MARGIN)
+                    x = SAFE_MARGIN + 1
+                    steps = 50
+                    failsafe_hits = 0
+                    interrupted = False
+                    for i in range(steps):
+                        if stop_event.is_set():
+                            done_callback()
+                            return
+                        y = SAFE_MARGIN + (i * 4) % usable_h
+                        target = (x, y)
+                        try:
+                            pyautogui.moveTo(*target)
+                            actual = pyautogui.position()
+                            if abs(actual.x - target[0]) > TOLERANCE_PX or \
+                               abs(actual.y - target[1]) > TOLERANCE_PX:
+                                log_callback("Movement cancelled - user took control.")
+                                interrupted = True
+                                break
+                        except pyautogui.FailSafeException:
+                            pos = pyautogui.position()
+                            log_callback(
+                                f"Failsafe at ({pos.x},{pos.y}) {datetime.now().strftime('%H:%M:%S')} - attempting recovery"
+                            )
+                            failsafe_hits += 1
+                            try:
+                                pyautogui.moveTo(SAFE_MARGIN + 1, SAFE_MARGIN + 1)
+                            except pyautogui.FailSafeException:
+                                failsafe_hits += 1
+                            if failsafe_hits >= FAILSAFE_RECOVERIES:
+                                raise
+                            continue
+
+                    if not interrupted:
+                        try:
+                            pyautogui.moveTo(SAFE_MARGIN + 1, SAFE_MARGIN + 1)
+                        except pyautogui.FailSafeException:
+                            pos = pyautogui.position()
+                            log_callback(
+                                f"Failsafe at ({pos.x},{pos.y}) {datetime.now().strftime('%H:%M:%S')} during parking - attempting recovery"
+                            )
+                            failsafe_hits += 1
+                            try:
+                                pyautogui.moveTo(SAFE_MARGIN + 1, SAFE_MARGIN + 1)
+                            except pyautogui.FailSafeException:
+                                failsafe_hits += 1
+                            if failsafe_hits >= FAILSAFE_RECOVERIES:
+                                raise
+                        for _ in range(3):
+                            if stop_event.is_set():
+                                done_callback()
+                                return
+                            pyautogui.press("shift")
+
+                        log_callback(f"Movement made at {datetime.now().strftime('%H:%M:%S')}")
+                else:
+                    log_callback(f"Skipped at {datetime.now().strftime('%H:%M:%S')} (mouse moved)")
+
+            done_callback()
+            return
+        except pyautogui.FailSafeException:
+            if stop_event.is_set():
+                break
+            retries += 1
+            if retries <= MAX_RETRIES:
+                log_callback(
+                    f"PyAutoGUI failsafe triggered - retrying ({retries}/{MAX_RETRIES})"
+                )
                 time.sleep(1)
-
-            # Get position now
-            end_pos = pyautogui.position()
-
-            # Compare positions with tolerance
-            moved = abs(end_pos.x - start_pos.x) > TOLERANCE_PX or \
-                    abs(end_pos.y - start_pos.y) > TOLERANCE_PX
-
-            if not moved:
-                # Perform safe movement path
-                width, height = pyautogui.size()
-                usable_h = max(1, height - 2 * SAFE_MARGIN)
-                x = SAFE_MARGIN + 1
-                steps = 50
-                for i in range(steps):
-                    if stop_event.is_set():
-                        return
-                    y = SAFE_MARGIN + (i * 4) % usable_h
-                    pyautogui.moveTo(x, y)
-
-                # Park somewhere safe and tap Shift
-                pyautogui.moveTo(SAFE_MARGIN + 1, SAFE_MARGIN + 1)
-                for _ in range(3):
-                    if stop_event.is_set():
-                        return
-                    pyautogui.press("shift")
-
-                log_callback(f"Movement made at {datetime.now().strftime('%H:%M:%S')}")
             else:
-                log_callback(f"Skipped at {datetime.now().strftime('%H:%M:%S')} (mouse moved)")
+                log_callback("PyAutoGUI failsafe triggered repeatedly - giving up.")
+        except Exception as e:
+            if stop_event.is_set():
+                break
+            retries += 1
+            if retries <= MAX_RETRIES:
+                log_callback(
+                    f"Worker stopped unexpectedly ({e}). Retrying ({retries}/{MAX_RETRIES})"
+                )
+                time.sleep(1)
+            else:
+                log_callback(f"Worker stopped unexpectedly ({e}). Giving up.")
 
-    except pyautogui.FailSafeException:
-        log_callback("PyAutoGUI failsafe triggered (mouse hit a corner). Stopping.")
-    finally:
-        done_callback()
+    done_callback()
 
 class KeepAwakeApp(tk.Tk):
     def __init__(self):
